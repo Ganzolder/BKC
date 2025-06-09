@@ -1,0 +1,255 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Калькулятор Эффективности Поездок</title>
+    <link rel="stylesheet" href="index.css">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+
+    <!-- Theme Color for PWA -->
+    <meta name="theme-color" content="#343a40">
+
+    <!-- Apple PWA specific meta tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Калькулятор Поездок">
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png"> 
+
+    <link rel="icon" href="data:;base64,iVBORw0KGgo="> <!-- Existing favicon, can be replaced by PWA icons -->
+
+<link rel="stylesheet" href="/index.css">
+</head>
+<body>
+    <div id="app-container">
+        <h1>Калькулятор Эффективности Поездок</h1>
+
+        <div id="calculator-view">
+            <section id="input-section" aria-labelledby="input-heading">
+                <h2 id="input-heading">Входные данные</h2>
+                
+                <div class="form-group">
+                    <label for="denNedeliInput">День недели:</label>
+                    <select id="denNedeliInput" name="denNedeli" aria-describedby="denNedeliDescription" disabled>
+                        <option value="Понедельник">Понедельник</option>
+                        <option value="Вторник">Вторник</option>
+                        <option value="Среда">Среда</option>
+                        <option value="Четверг">Четверг</option>
+                        <option value="Пятница">Пятница</option>
+                        <option value="Суббота">Суббота</option>
+                        <option value="Воскресенье">Воскресенье</option>
+                    </select>
+                    <small id="denNedeliDescription" class="sr-only">День недели (определяется автоматически по дате).</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="dataInput">Дата:</label>
+                    <input type="date" id="dataInput" name="data" aria-describedby="dataDescription">
+                    <small id="dataDescription" class="sr-only">Выберите дату поездки.</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="probegInput">Пробег (D1), км:</label>
+                    <input type="number" id="probegInput" name="probeg" step="any" value="0" aria-describedby="probegDescription">
+                    <small id="probegDescription" class="sr-only">Общий пробег за смену в километрах.</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="raskhodInput">Расход (E1), л/100км:</label>
+                    <input type="number" id="raskhodInput" name="raskhod" step="0.1" value="0" aria-describedby="raskhodDescription">
+                    <small id="raskhodDescription" class="sr-only">Средний расход топлива литров на 100 км.</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="cenaAI92Input">Цена АИ-92 (G1), р.:</label>
+                    <input type="number" id="cenaAI92Input" name="cenaAI92" step="0.01" value="0" aria-describedby="cenaAI92Description">
+                    <small id="cenaAI92Description" class="sr-only">Цена одного литра топлива АИ-92.</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="vremyaVPutiInput">Время в пути (J1), ч:</label>
+                    <input type="number" id="vremyaVPutiInput" name="vremyaVPuti" step="0.1" value="0" aria-describedby="vremyaVPutiDescription">
+                    <small id="vremyaVPutiDescription" class="sr-only">Общее время в пути в часах.</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="smenaChInput">Смена (K1), ч:</label>
+                    <input type="number" id="smenaChInput" name="smenaCh" step="0.1" value="0" aria-describedby="smenaChDescription">
+                    <small id="smenaChDescription" class="sr-only">Общая продолжительность смены в часах.</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="zakazovDo23Input">Заказов до 23:00 (L1):</label>
+                    <input type="number" id="zakazovDo23Input" name="zakazovDo23" step="1" value="0" aria-describedby="zakazovDo23Description">
+                    <small id="zakazovDo23Description" class="sr-only">Количество заказов, выполненных до 23:00.</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="zakazovPosle23Input">Заказов после 23:00 (M1):</label>
+                    <input type="number" id="zakazovPosle23Input" name="zakazovPosle23" step="1" value="0" aria-describedby="zakazovPosle23Description">
+                    <small id="zakazovPosle23Description" class="sr-only">Количество заказов, выполненных после 23:00.</small>
+                </div>
+                
+                <button id="save-button">Записать</button>
+            </section>
+
+            <section id="results-section" aria-labelledby="results-heading">
+                <h2 id="results-heading">Результаты текущего дня</h2>
+                <div class="result-item">
+                    <p>Заказов всего (C1): <span id="zakazovVsegoResult" aria-live="polite">_</span></p>
+                </div>
+                <div class="result-item">
+                    <p>Ср. расстояние на заказ (F1), км: <span id="srRasstoyanieResult" aria-live="polite">_</span></p>
+                </div>
+                <div class="result-item">
+                    <p>Топлива затрачено (H1), л: <span id="toplivaZatrachenoResult" aria-live="polite">_</span></p>
+                </div>
+                <div class="result-item">
+                    <p>ГСМ (I1), р.: <span id="gsmResult" aria-live="polite">_</span></p>
+                </div>
+                <div class="result-item">
+                    <p>Сумма выплат расчетная (N1), р.: <span id="summaVyplatRaschetnayaResult" aria-live="polite">_</span></p>
+                </div>
+                <div class="result-item">
+                    <p>Сумма чистыми расчетная (-ГСМ) (P1), р.: <span id="summaChistymiRaschetnayaResult" aria-live="polite">_</span></p>
+                </div>
+                <div class="result-item">
+                    <p>% затрат на ГСМ (Q1): <span id="protsentZatratResult" aria-live="polite">_</span></p>
+                </div>
+                <div class="result-item">
+                    <p>В час чистыми (R1), р.: <span id="vChasChistymiResult" aria-live="polite">_</span></p>
+                </div>
+            </section>
+        </div>
+
+        <div id="summary-view" style="display: none;">
+            <section id="actual-payout-section" aria-labelledby="actual-payout-heading">
+                <h2 id="actual-payout-heading">Регистрация фактической выплаты</h2>
+                <div class="form-group">
+                    <label for="actualPayoutDateInput">Дата получения:</label>
+                    <input type="date" id="actualPayoutDateInput" name="actualPayoutDate">
+                </div>
+                <div class="form-group">
+                    <label for="actualPayoutAmountInput">Сумма выплаты факт, р.:</label>
+                    <input type="number" id="actualPayoutAmountInput" name="actualPayoutAmount" step="0.01" value="0">
+                </div>
+                <button id="recordActualPayoutButton">Получил</button>
+                 <p id="total-actual-payouts-display" class="total-display">Общая сумма полученных выплат (всего): <span id="total-actual-payouts-sum">0.00</span> р.</p>
+            </section>
+
+            <section id="summary-section" aria-labelledby="summary-heading">
+                <h2 id="summary-heading">Сводная информация по поездкам</h2>
+                
+                <div id="net-balance-container" class="summary-totals-container net-balance-highlight">
+                    <p>Баланс (Расчетный доход - Факт. выплаты в периоде): <span id="net-balance-amount" style="font-weight: bold;">0.00</span> р.</p>
+                </div>
+
+                <div class="date-filter-container">
+                    <h3>Фильтр по датам:</h3>
+                    <div class="form-group">
+                        <label for="dateFilterFrom">От:</label>
+                        <input type="date" id="dateFilterFrom">
+                    </div>
+                    <div class="form-group">
+                        <label for="dateFilterTo">До:</label>
+                        <input type="date" id="dateFilterTo">
+                    </div>
+                    <button id="applyDateFilterButton">Применить фильтр</button>
+                    <button id="resetDateFilterButton">Сбросить фильтр</button>
+                </div>
+
+                <div id="summary-totals" class="summary-totals-container">
+                    <p>Всего заказов (в периоде): <span id="total-orders">0</span></p>
+                    <p>Общая сумма выплат (расч. в периоде): <span id="total-payout">0.00</span> р.</p>
+                </div>
+                <div class="table-container">
+                    <table id="summary-table" aria-describedby="summary-totals">
+                        <caption>Сохраненные поездки</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col">День недели</th>
+                                <th scope="col">Дата</th>
+                                <th scope="col">Кол-во заказов</th>
+                                <th scope="col">Сумма выплат (расч.), р.</th>
+                                <th scope="col">Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Данные будут добавлены сюда скриптом -->
+                        </tbody>
+                    </table>
+                </div>
+                <p id="no-data-message" style="display: none; text-align: center; margin-top: 20px;">Нет сохраненных данных.</p>
+            </section>
+        </div>
+
+        <div id="payouts-view" style="display: none;">
+            <section id="payouts-list-section" aria-labelledby="payouts-list-heading">
+                <h2 id="payouts-list-heading">Зарегистрированные выплаты</h2>
+                 <p id="payouts-filter-info" style="text-align: center; font-style: italic; margin-bottom: 10px;"></p>
+                <div class="table-container">
+                    <table id="payouts-table">
+                        <caption>Список полученных выплат</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col">Дата получения</th>
+                                <th scope="col">Сумма выплаты, р.</th>
+                                <th scope="col">Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Данные о выплатах -->
+                        </tbody>
+                    </table>
+                </div>
+                <p id="no-payouts-message" style="display: none; text-align: center; margin-top: 20px;">Нет зарегистрированных выплат за выбранный период.</p>
+            </section>
+            <section id="edit-payout-section" style="display: none;" aria-labelledby="edit-payout-heading">
+                <h3 id="edit-payout-heading">Редактировать выплату</h3>
+                <input type="hidden" id="editingPayoutId">
+                <div class="form-group">
+                    <label for="editingPayoutDateInput">Дата получения:</label>
+                    <input type="date" id="editingPayoutDateInput">
+                </div>
+                <div class="form-group">
+                    <label for="editingPayoutAmountInput">Сумма выплаты, р.:</label>
+                    <input type="number" id="editingPayoutAmountInput" step="0.01">
+                </div>
+                <button id="savePayoutEditButton">Сохранить изменения выплаты</button>
+                <button id="cancelPayoutEditButton">Отмена</button>
+            </section>
+        </div>
+
+        <nav id="navigation-bar">
+            <button id="nav-calculator-button" class="nav-button active" aria-label="Перейти к калькулятору">
+                <span class="nav-icon">🚚</span> Калькулятор
+            </button>
+            <button id="nav-summary-button" class="nav-button" aria-label="Перейти к сводной информации">
+                <span class="nav-icon">📊</span> Сводка
+            </button>
+            <button id="nav-payouts-button" class="nav-button" aria-label="Перейти к выплатам">
+                <span class="nav-icon">💰</span> Выплаты
+            </button>
+        </nav>
+
+    </div>
+    <script type="module" src="index.tsx"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js')
+              .then(registration => {
+                console.log('ServiceWorker registration successful with scope: ', registration.scope);
+              })
+              .catch(error => {
+                console.log('ServiceWorker registration failed: ', error);
+              });
+          });
+        }
+    </script>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
