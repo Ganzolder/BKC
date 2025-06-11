@@ -1,4 +1,3 @@
-
 {
   "name": "Калькулятор Курьера",
   "short_name": "КурьерКалк",
@@ -8,6 +7,7 @@
   "scope": "/",
   "display": "standalone",
   "display_override": [
+    "window-controls-overlay",
     "standalone"
   ],
   "background_color": "#ffffff",
