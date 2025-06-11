@@ -285,14 +285,24 @@
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
+                console.log('Window loaded, attempting to register ServiceWorker...'); // Added log
                 navigator.serviceWorker.register('/sw.js')
                     .then(registration => {
                         console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                        if (registration.installing) {
+                            console.log('Service worker installing.');
+                        } else if (registration.waiting) {
+                            console.log('Service worker installed & waiting.');
+                        } else if (registration.active) {
+                            console.log('Service worker active.');
+                        }
                     })
                     .catch(error => {
-                        console.log('ServiceWorker registration failed: ', error);
+                        console.error('ServiceWorker registration failed: ', error); // Changed to console.error
                     });
             });
+        } else {
+            console.log('ServiceWorker not supported in this browser.'); // Added for completeness
         }
     </script>
 <script type="module" src="/index.tsx"></script>

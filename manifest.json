@@ -1,13 +1,28 @@
 
 {
-  "name": "BK courier V6",
-  "short_name": "BK Courier",
-  "description": "Burger king расчёт выплат",
+  "name": "Калькулятор Курьера",
+  "short_name": "КурьерКалк",
+  "description": "Приложение для расчета доходов, расходов и ведения статистики работы курьера.",
+  "id": "/index.html?utm_source=homescreen",
   "start_url": "/index.html?utm_source=homescreen",
+  "scope": "/",
   "display": "standalone",
+  "display_override": [
+    "standalone"
+  ],
   "background_color": "#ffffff",
   "theme_color": "#343a40",
   "orientation": "portrait-primary",
+  "lang": "ru",
+  "dir": "auto",
+  "categories": [
+    "finance",
+    "productivity",
+    "business"
+  ],
+  "iarc_rating_id": "",
+  "prefer_related_applications": false,
+  "related_applications": [],
   "icons": [
     {
       "src": "icons/icon-192x192.png",
@@ -21,5 +36,20 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
-  ]
+  ],
+  "screenshots": [],
+  "launch_handler": {
+    "client_mode": [
+      "navigate-existing",
+      "auto"
+    ]
+  },
+  "file_handlers": [],
+  "protocol_handlers": [],
+  "share_target": {},
+  "shortcuts": [],
+  "widgets": [],
+  "edge_side_panel": {},
+  "handle_links": "auto",
+  "scope_extensions": []
 }
