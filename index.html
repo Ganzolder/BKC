@@ -120,7 +120,7 @@
                     <input type="number" id="actualPayoutAmountInput" name="actualPayoutAmount" step="0.01" value="0">
                 </div>
                 <button id="recordActualPayoutButton">Получил</button>
-                 <p id="total-actual-payouts-display" class="total-display">Общая сумма полученных выплат (всего): <span id="total-actual-payouts-sum">0.00</span> р.</p>
+                 <p id="total-actual-payouts-display" class="total-display"><span id="total-actual-payouts-label-text">Общая сумма полученных выплат (всего):</span> <span id="total-actual-payouts-sum">0.00</span> р.</p>
             </section>
 
             <section id="summary-section" aria-labelledby="summary-heading">
@@ -129,6 +129,34 @@
                 <div id="net-balance-container" class="summary-totals-container net-balance-highlight">
                     <p>Баланс (Расчетный доход - Факт. выплаты в периоде): <span id="net-balance-amount" style="font-weight: bold;">0.00</span> р.</p>
                 </div>
+
+                <div id="weekly-summary-container">
+                    <button id="toggle-weekly-summary-button" class="toggle-summary-button" aria-expanded="false" aria-controls="weekly-summary-details-region">
+                        Еженедельная сводка <span class="toggle-icon" aria-hidden="true">▼</span>
+                    </button>
+                    <div id="weekly-summary-details-region" role="region" aria-labelledby="toggle-weekly-summary-button" style="display: none;">
+                        <div class="table-container">
+                            <table id="weekly-summary-table" aria-labelledby="toggle-weekly-summary-button">
+                                <caption>Еженедельная сводка по поездкам (Пн-Вс)</caption>
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Неделя</th>
+                                        <th scope="col">Всего Заказов</th>
+                                        <th scope="col">Всего Выплат (расч.), р.</th>
+                                        <th scope="col">Смен</th>
+                                        <th scope="col">Ср. Заказов/Смену</th>
+                                        <th scope="col">Ср. Выплат/Смену, р.</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="weekly-summary-table-body">
+                                    <!-- Data will be populated here -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <p id="no-weekly-data-message" style="display: none; text-align: center; margin-top: 10px;">Нет данных для еженедельной сводки в выбранном периоде.</p>
+                    </div>
+                </div>
+
 
                 <div class="date-filter-container">
                     <h3>Фильтр по датам:</h3>

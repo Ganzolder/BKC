@@ -37,6 +37,15 @@ interface AppSettings {
     amortizationPerKm: number; // New setting for amortization cost per km
 }
 
+interface WeeklyAggregatedData {
+    weekStartDate: string; // Monday's date YYYY-MM-DD
+    weekEndDate: string;   // Sunday's date YYYY-MM-DD
+    weekLabel: string; // e.g. "2023-10-23 - 2023-10-29"
+    totalOrders: number;
+    totalPayout: number;
+    shiftsWorked: number;
+}
+
 
 document.addEventListener('DOMContentLoaded', () => {
     // --- Constants & Settings ---
@@ -101,6 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const actualPayoutDateInput = document.getElementById('actualPayoutDateInput') as HTMLInputElement;
     const actualPayoutAmountInput = document.getElementById('actualPayoutAmountInput') as HTMLInputElement;
     const recordActualPayoutButton = document.getElementById('recordActualPayoutButton') as HTMLButtonElement;
+    const totalActualPayoutsLabelTextSpan = document.getElementById('total-actual-payouts-label-text') as HTMLSpanElement;
     const totalActualPayoutsSumSpan = document.getElementById('total-actual-payouts-sum') as HTMLSpanElement;
     const netBalanceAmountSpan = document.getElementById('net-balance-amount') as HTMLSpanElement;
     
@@ -115,6 +125,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const totalPayoutSpan = document.getElementById('total-payout') as HTMLSpanElement;
     const noDataMessage = document.getElementById('no-data-message') as HTMLParagraphElement;
 
+    // Weekly Summary Elements
+    const toggleWeeklySummaryButton = document.getElementById('toggle-weekly-summary-button') as HTMLButtonElement;
+    const weeklySummaryDetailsRegion = document.getElementById('weekly-summary-details-region') as HTMLElement;
+    const weeklySummaryTableBody = document.getElementById('weekly-summary-table-body') as HTMLTableSectionElement;
+    const noWeeklyDataMessage = document.getElementById('no-weekly-data-message') as HTMLParagraphElement;
+
     // Overall Statistics Elements
     const overallStatisticsSection = document.getElementById('overall-statistics-section') as HTMLElement;
     const overallStatsTotalOrdersSpan = document.getElementById('overall-stats-total-orders') as HTMLSpanElement;
@@ -126,7 +142,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const overallStatsTotalFuelBurnedSpan = document.getElementById('overall-stats-total-fuel-burned') as HTMLSpanElement;
     const overallStatsTotalFuelCostSpan = document.getElementById('overall-stats-total-fuel-cost') as HTMLSpanElement;
     const overallStatsAvgFuelCostPerOrderSpan = document.getElementById('overall-stats-avg-fuel-cost-per-order') as HTMLSpanElement;
-    // New Overall Statistics Spans
     const overallStatsAmortizationCostSpan = document.getElementById('overall-stats-amortization-cost') as HTMLSpanElement;
     const overallStatsFuelCostPercentageSpan = document.getElementById('overall-stats-fuel-cost-percentage') as HTMLSpanElement;
     const overallStatsTotalCostPercentageSpan = document.getElementById('overall-stats-total-cost-percentage') as HTMLSpanElement;
@@ -134,7 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const overallStatsEquivalentMonthlyIncomeSpan = document.getElementById('overall-stats-equivalent-monthly-income') as HTMLSpanElement;
     const overallStatsMonthProgressPercentageSpan = document.getElementById('overall-stats-month-progress-percentage') as HTMLSpanElement;
     const overallStatsEarningsForecastSpan = document.getElementById('overall-stats-earnings-forecast') as HTMLSpanElement;
-    const overallStatsAvgGrossPerShiftPeriodSpan = document.getElementById('overall-stats-avg-gross-per-effective-shift') as HTMLSpanElement; // ID remains, but meaning changes
+    const overallStatsAvgGrossPerShiftPeriodSpan = document.getElementById('overall-stats-avg-gross-per-effective-shift') as HTMLSpanElement; 
 
 
     // Payouts View
@@ -156,7 +171,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const settingU1CenaPosle23Input = document.getElementById('settingU1CenaPosle23') as HTMLInputElement;
     const settingV1KompensatsiaInput = document.getElementById('settingV1Kompensatsia') as HTMLInputElement;
     const settingK1SmenaDefaultInput = document.getElementById('settingK1SmenaDefault') as HTMLInputElement; 
-    const settingAmortizationPerKmInput = document.getElementById('settingAmortizationPerKm') as HTMLInputElement; // New setting input
+    const settingAmortizationPerKmInput = document.getElementById('settingAmortizationPerKm') as HTMLInputElement;
     const saveSettingsButton = document.getElementById('save-settings-button') as HTMLButtonElement;
     const backToCalculatorButton = document.getElementById('back-to-calculator-button') as HTMLButtonElement;
 
@@ -180,7 +195,6 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             appSettings = { ...DEFAULT_SETTINGS };
         }
-        // Apply to inputs in settings view
         settingS1ProbegInput.value = appSettings.s1_probegDoRaboty.toString();
         settingT1CenaDo23Input.value = appSettings.t1_cenaZakazaDo23.toString();
         settingU1CenaPosle23Input.value = appSettings.u1_cenaZakazaPosle23.toString();
@@ -196,7 +210,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const newV1 = parseFloat(settingV1KompensatsiaInput.value);
         const newK1 = parseFloat(settingK1SmenaDefaultInput.value);
         const newAmortization = parseFloat(settingAmortizationPerKmInput.value);
-
 
         if (isNaN(newS1) || isNaN(newT1) || isNaN(newU1) || isNaN(newV1) || isNaN(newK1) || isNaN(newAmortization) ||
             newS1 < 0 || newT1 < 0 || newU1 < 0 || newV1 < 0 || newK1 <=0 || newAmortization < 0 ) {
@@ -214,10 +227,9 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem(SETTINGS_LS_KEY, JSON.stringify(appSettings));
         alert("Настройки сохранены!");
         calculateResults(); 
-        if (summaryView.style.display === 'block') renderSummaryTable();
+        if (summaryView.style.display === 'block') applyFilters(); // Re-apply filters if summary view is active
         return true;
     };
-
 
     const getTripData = (): TripData[] => JSON.parse(localStorage.getItem(TRIP_DATA_LS_KEY) || '[]');
     const saveTripDataToLS = (data: TripData[]): void => localStorage.setItem(TRIP_DATA_LS_KEY, JSON.stringify(data));
@@ -228,6 +240,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const formatDateForFilename = (date: Date): string => `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
     const formatDateForStorage = (date: Date): string => date.toISOString().split('T')[0];
 
+    const getMonday = (d: Date): Date => {
+        const date = new Date(d);
+        const day = date.getDay(); // Sunday - 0, Monday - 1, ...
+        const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+        return new Date(date.setDate(diff));
+    };
+    
     const getDayOfWeekName = (dateString: string): string => {
         if (!dateString) return DNI_NEDELI_MAP[0];
         try {
@@ -307,7 +326,6 @@ document.addEventListener('DOMContentLoaded', () => {
         link.click();
         document.body.removeChild(link);
     };
-
 
     const clearResultSpans = () => {
         [zakazovVsegoResultSpan, srRasstoyanieResultSpan, toplivaZatrachenoResultSpan,
@@ -429,8 +447,12 @@ document.addEventListener('DOMContentLoaded', () => {
         payoutsView.style.display = 'none';
         settingsView.style.display = 'none';
         setActiveNavButton(navSummaryButton);
-        renderSummaryTable(); 
-        updateTotalActualPayoutsDisplay(); 
+        
+        // Set default "From" date if both filters are empty (e.g., on first load of summary view)
+        if (!dateFilterFromInput.value && !dateFilterToInput.value) {
+            dateFilterFromInput.value = formatDateForStorage(getMonday(new Date()));
+        }
+        applyFilters(); // This will render tables and update displays based on filters
         lastActiveViewFn = showSummaryView;
     };
 
@@ -440,7 +462,7 @@ document.addEventListener('DOMContentLoaded', () => {
         payoutsView.style.display = 'block';
         settingsView.style.display = 'none';
         setActiveNavButton(navPayoutsButton);
-        const filterFrom = dateFilterFromInput.value;
+        const filterFrom = dateFilterFromInput.value; // Use existing filters from summary view
         const filterTo = dateFilterToInput.value;
         renderPayoutsTable(filterFrom, filterTo);
         editPayoutSection.style.display = 'none'; 
@@ -541,9 +563,8 @@ document.addEventListener('DOMContentLoaded', () => {
         let statTotalCostPercentage = 0;
         let statAvgHourlyIncome = 0;
         let statEquivalentMonthlyIncome = 0;
-        let statAvgGrossPerShiftInPeriod = 0; // Renamed for clarity from statAvgGrossPerEffectiveShift
+        let statAvgGrossPerShiftInPeriod = 0; 
 
-        // Period-based calculations
         if (filteredTrips.length > 0) {
             overallStatisticsSection.style.display = 'block';
             statShiftsWorked = filteredTrips.length;
@@ -575,22 +596,20 @@ document.addEventListener('DOMContentLoaded', () => {
             statTotalCostPercentage = periodTotalCalculatedPayout > 0 ? (totalExpenses / periodTotalCalculatedPayout) * 100 : 0;
             
             const totalHoursWorked = statShiftsWorked * appSettings.k1_smenaChDefault;
-            statAvgHourlyIncome = totalHoursWorked > 0 ? periodTotalCalculatedPayout / totalHoursWorked : 0;
-            statEquivalentMonthlyIncome = statAvgHourlyIncome * 8 * 21; // Assuming 8 hours/day, 21 working days
+            statAvgHourlyIncome = totalHoursWorked > 0 ? (periodTotalCalculatedPayout - totalExpenses) / totalHoursWorked : 0; // Net hourly income
+            statEquivalentMonthlyIncome = statAvgHourlyIncome * 8 * 21; 
 
-            // New calculation for "Грязными в смену в среднем (в периоде)"
             statAvgGrossPerShiftInPeriod = statShiftsWorked > 0 ? periodTotalCalculatedPayout / statShiftsWorked : 0;
 
         } else {
             overallStatisticsSection.style.display = 'none';
         }
 
-        // --- Earnings Forecast (Current Month based) ---
         let statEarningsForecast = 0;
         const allTripsForForecast = getTripData();
         const now = new Date();
         const currentYear = now.getFullYear();
-        const currentMonth = now.getMonth(); // 0-indexed
+        const currentMonth = now.getMonth(); 
 
         const tripsThisMonth = allTripsForForecast.filter(trip => {
             const tripDate = new Date(trip.data);
@@ -613,46 +632,38 @@ document.addEventListener('DOMContentLoaded', () => {
             const daysInCurrentActualMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
             for (let day = 1; day <= daysInCurrentActualMonth; day++) {
                 const d = new Date(currentYear, currentMonth, day);
-                const dayOfWeek = d.getDay(); // Sunday = 0, ..., Saturday = 6
-                if (dayOfWeek === 2) tuesdaysInMonth++;      // Tuesday
-                else if (dayOfWeek === 3) wednesdaysInMonth++; // Wednesday
-                else if (dayOfWeek === 5) fridaysInMonth++;    // Friday
-                else if (dayOfWeek === 6) saturdaysInMonth++;  // Saturday
+                const dayOfWeek = d.getDay(); 
+                if (dayOfWeek === 2) tuesdaysInMonth++;      
+                else if (dayOfWeek === 3) wednesdaysInMonth++; 
+                else if (dayOfWeek === 5) fridaysInMonth++;    
+                else if (dayOfWeek === 6) saturdaysInMonth++;  
             }
             const effectiveDaysForForecast = tuesdaysInMonth + fridaysInMonth + saturdaysInMonth + (wednesdaysInMonth / 2);
             statEarningsForecast = avgIncomePerOrderCurrentMonth * avgOrdersPerShiftCurrentMonth * effectiveDaysForForecast;
         }
 
-        // Month progress - always calculated regardless of filter
         const today = new Date();
         const currentDayOfMonth = today.getDate();
         const daysInCurrentMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
         const statMonthProgressPercentage = daysInCurrentMonth > 0 ? (currentDayOfMonth / daysInCurrentMonth) * 100 : 0;
 
-        // Update existing spans for period-based stats
         overallStatsTotalOrdersSpan.textContent = periodTotalOrders.toString();
         overallStatsShiftsWorkedSpan.textContent = statShiftsWorked.toString();
-        // avg orders per shift is updated inside the if block for period
         overallStatsTotalMileageSpan.textContent = statTotalMileage.toFixed(1) + ' км';
         overallStatsAvgFuelConsumptionSpan.textContent = isNaN(statAvgFuelConsumption) || !isFinite(statAvgFuelConsumption) ? 'Н/Д' : statAvgFuelConsumption.toFixed(2) + ' л';
         overallStatsAvgMileagePerOrderSpan.textContent = isNaN(statAvgMileagePerOrderRoundTrip) || !isFinite(statAvgMileagePerOrderRoundTrip) ? 'Н/Д' : statAvgMileagePerOrderRoundTrip.toFixed(1) + ' км';
         overallStatsTotalFuelBurnedSpan.textContent = statTotalFuelBurned.toFixed(2) + ' л';
         overallStatsTotalFuelCostSpan.textContent = statTotalFuelCost.toFixed(2) + ' р.';
         overallStatsAvgFuelCostPerOrderSpan.textContent = isNaN(statAvgFuelCostPerOrder) || !isFinite(statAvgFuelCostPerOrder) ? 'Н/Д' : statAvgFuelCostPerOrder.toFixed(2) + ' р.';
-
-        // Update new spans for period-based stats
         overallStatsAmortizationCostSpan.textContent = statTotalAmortizationCost.toFixed(2) + ' р.';
         overallStatsFuelCostPercentageSpan.textContent = isNaN(statFuelCostPercentage) || !isFinite(statFuelCostPercentage) ? 'Н/Д' : statFuelCostPercentage.toFixed(2) + ' %';
         overallStatsTotalCostPercentageSpan.textContent = isNaN(statTotalCostPercentage) || !isFinite(statTotalCostPercentage) ? 'Н/Д' : statTotalCostPercentage.toFixed(2) + ' %';
         overallStatsAvgHourlyIncomeSpan.textContent = isNaN(statAvgHourlyIncome) || !isFinite(statAvgHourlyIncome) ? 'Н/Д' : statAvgHourlyIncome.toFixed(2) + ' р.';
         overallStatsEquivalentMonthlyIncomeSpan.textContent = isNaN(statEquivalentMonthlyIncome) || !isFinite(statEquivalentMonthlyIncome) ? 'Н/Д' : statEquivalentMonthlyIncome.toFixed(2) + ' р.';
         overallStatsAvgGrossPerShiftPeriodSpan.textContent = isNaN(statAvgGrossPerShiftInPeriod) || !isFinite(statAvgGrossPerShiftInPeriod) ? 'Н/Д' : statAvgGrossPerShiftInPeriod.toFixed(2) + ' р.';
-        
-        // Update non-period based stats
         overallStatsMonthProgressPercentageSpan.textContent = isNaN(statMonthProgressPercentage) || !isFinite(statMonthProgressPercentage) ? '0.0' : statMonthProgressPercentage.toFixed(1) + ' %';
         overallStatsEarningsForecastSpan.textContent = isNaN(statEarningsForecast) || !isFinite(statEarningsForecast) ? 'Н/Д' : statEarningsForecast.toFixed(2) + ' р.';
     };
-
 
     const renderSummaryTable = () => {
         const filterFrom = dateFilterFromInput.value;
@@ -668,14 +679,10 @@ document.addEventListener('DOMContentLoaded', () => {
             summaryTableBody.parentElement!.style.display = 'none'; 
             totalOrdersSpan.textContent = '0';
             totalPayoutSpan.textContent = '0.00';
-            overallStatisticsSection.style.display = 'none'; // Hide if no data
         } else {
             noDataMessage.style.display = 'none';
             summaryTableBody.parentElement!.style.display = ''; 
-            overallStatisticsSection.style.display = 'block'; // Show if data
-
             dataToRender.sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime()); 
-
             dataToRender.forEach(item => {
                 const row = summaryTableBody.insertRow();
                 row.insertCell().textContent = item.denNedeli;
@@ -694,21 +701,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 grandTotalOrders += item.zakazovVsego;
                 grandTotalPayout += item.summaVyplatRaschetnaya;
             });
-
             totalOrdersSpan.textContent = grandTotalOrders.toString();
             totalPayoutSpan.textContent = grandTotalPayout.toFixed(2);
         }
         updateNetBalanceDisplay(); 
-        // Always call renderOverallStatistics, it will handle its own display logic for period based items
-        // and current month items are calculated independently
         renderOverallStatistics(dataToRender, grandTotalOrders, grandTotalPayout); 
     };
 
-    const updateTotalActualPayoutsDisplay = () => { 
-        const payouts = getRecordedPayouts();
-        const total = payouts.reduce((sum, payout) => sum + payout.amount, 0);
+    const updateTotalActualPayoutsDisplay = (filterFrom?: string, filterTo?: string) => {
+        let payoutsToSum = getRecordedPayouts();
+
+        if (filterFrom && filterTo) {
+            payoutsToSum = payoutsToSum.filter(p => p.date >= filterFrom && p.date <= filterTo);
+        } else if (filterFrom) {
+            payoutsToSum = payoutsToSum.filter(p => p.date >= filterFrom);
+        } else if (filterTo) {
+            payoutsToSum = payoutsToSum.filter(p => p.date <= filterTo);
+        }
+        // If no filters, all payouts are summed
+
+        const total = payoutsToSum.reduce((sum, payout) => sum + payout.amount, 0);
         totalActualPayoutsSumSpan.textContent = total.toFixed(2);
+
+        if (totalActualPayoutsLabelTextSpan) {
+            const baseText = "Общая сумма полученных выплат";
+            const periodText = (filterFrom || filterTo) ? "(в периоде)" : "(всего)";
+            totalActualPayoutsLabelTextSpan.textContent = `${baseText} ${periodText}:`;
+        }
     };
+
 
     recordActualPayoutButton.addEventListener('click', () => {
         const date = actualPayoutDateInput.value;
@@ -737,13 +758,80 @@ document.addEventListener('DOMContentLoaded', () => {
         alert("Фактическая выплата зарегистрирована!");
         actualPayoutDateInput.value = formatDateForStorage(new Date()); 
         actualPayoutAmountInput.value = '0';
-        updateTotalActualPayoutsDisplay();
+        
+        // Update displays based on current filters
+        updateTotalActualPayoutsDisplay(dateFilterFromInput.value, dateFilterToInput.value);
         updateNetBalanceDisplay(); 
         
         if (payoutsView.style.display === 'block') {
             renderPayoutsTable(dateFilterFromInput.value, dateFilterToInput.value);
         }
     });
+
+    const renderWeeklySummaryTable = (filterFrom?: string, filterTo?: string) => {
+        const trips = getFilteredTripData(filterFrom, filterTo);
+        weeklySummaryTableBody.innerHTML = '';
+
+        if (trips.length === 0) {
+            noWeeklyDataMessage.style.display = 'block';
+            weeklySummaryTableBody.parentElement!.style.display = 'none';
+            return;
+        }
+
+        noWeeklyDataMessage.style.display = 'none';
+        weeklySummaryTableBody.parentElement!.style.display = '';
+
+        const weeklyData: Map<string, WeeklyAggregatedData> = new Map();
+
+        trips.forEach(trip => {
+            const tripDate = new Date(trip.data);
+            const monday = getMonday(tripDate);
+            const mondayString = formatDateForStorage(monday);
+            
+            const sunday = new Date(monday);
+            sunday.setDate(monday.getDate() + 6);
+            const sundayString = formatDateForStorage(sunday);
+
+            const weekLabel = `${mondayString} - ${sundayString}`;
+
+            if (!weeklyData.has(mondayString)) {
+                weeklyData.set(mondayString, {
+                    weekStartDate: mondayString,
+                    weekEndDate: sundayString,
+                    weekLabel: weekLabel,
+                    totalOrders: 0,
+                    totalPayout: 0,
+                    shiftsWorked: 0,
+                });
+            }
+
+            const week = weeklyData.get(mondayString)!;
+            week.totalOrders += trip.zakazovVsego;
+            week.totalPayout += trip.summaVyplatRaschetnaya;
+            week.shiftsWorked += 1;
+        });
+
+        const sortedWeeks = Array.from(weeklyData.values()).sort((a, b) => 
+            new Date(b.weekStartDate).getTime() - new Date(a.weekStartDate).getTime()
+        );
+
+        sortedWeeks.forEach(week => {
+            const row = weeklySummaryTableBody.insertRow();
+            row.insertCell().textContent = week.weekLabel;
+            row.insertCell().textContent = week.totalOrders.toString();
+            row.insertCell().textContent = week.totalPayout.toFixed(2);
+            row.insertCell().textContent = week.shiftsWorked.toString();
+            const avgOrdersPerShift = week.shiftsWorked > 0 ? (week.totalOrders / week.shiftsWorked).toFixed(2) : '0.00';
+            const avgPayoutPerShift = week.shiftsWorked > 0 ? (week.totalPayout / week.shiftsWorked).toFixed(2) : '0.00';
+            row.insertCell().textContent = avgOrdersPerShift;
+            row.insertCell().textContent = avgPayoutPerShift;
+        });
+         if (sortedWeeks.length === 0) {
+            noWeeklyDataMessage.style.display = 'block';
+            weeklySummaryTableBody.parentElement!.style.display = 'none';
+        }
+
+    };
     
     const renderPayoutsTable = (filterFrom?: string, filterTo?: string) => {
         let payouts = getRecordedPayouts();
@@ -833,8 +921,9 @@ document.addEventListener('DOMContentLoaded', () => {
             alert("Выплата обновлена.");
             editPayoutSection.style.display = 'none';
             editingPayoutId = null;
+            // Re-render with current filters
             renderPayoutsTable(dateFilterFromInput.value, dateFilterToInput.value);
-            updateTotalActualPayoutsDisplay(); 
+            updateTotalActualPayoutsDisplay(dateFilterFromInput.value, dateFilterToInput.value); 
             updateNetBalanceDisplay(); 
         } else {
             alert("Ошибка: не удалось найти выплату для обновления.");
@@ -901,7 +990,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         saveTripDataToLS(allData);
-        if (summaryView.style.display === 'block') renderSummaryTable(); 
+        if (summaryView.style.display === 'block') applyFilters(); // Re-apply filters if summary view is active
         resetCalculatorForm(true); 
         calculateResults(); 
     });
@@ -931,16 +1020,23 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     const applyFilters = () => {
-        renderSummaryTable(); 
+        const filterFrom = dateFilterFromInput.value;
+        const filterTo = dateFilterToInput.value;
+
+        renderSummaryTable(); // Uses global filter inputs internally. Calls updateNetBalanceDisplay and renderOverallStatistics.
+        renderWeeklySummaryTable(filterFrom, filterTo);
+        updateTotalActualPayoutsDisplay(filterFrom, filterTo); // Update the visual sum in "Actual Payout" section.
+
         if (payoutsView.style.display === 'block') {
-            renderPayoutsTable(dateFilterFromInput.value, dateFilterToInput.value);
+            renderPayoutsTable(filterFrom, filterTo);
         }
     };
 
     applyDateFilterButton.addEventListener('click', applyFilters);
+
     resetDateFilterButton.addEventListener('click', () => {
-        dateFilterFromInput.value = '';
-        dateFilterToInput.value = '';
+        dateFilterFromInput.value = formatDateForStorage(getMonday(new Date())); // Default "from"
+        dateFilterToInput.value = ''; // Clear "to"
         applyFilters();
     });
 
@@ -1054,8 +1150,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             saveTripDataToLS(existingTrips);
             alert(`Импорт поездок завершен.\nНовых записей: ${importedCount}\nОбновлено записей: ${updatedCount}\nОшибок: ${errorCount}`);
-            if (summaryView.style.display === 'block') renderSummaryTable();
-            updateNetBalanceDisplay();
+            if (summaryView.style.display === 'block') applyFilters(); // Re-apply filters
             importTripsCsvInput.value = ''; 
             closeFileMenu();
         };
@@ -1126,9 +1221,12 @@ document.addEventListener('DOMContentLoaded', () => {
             saveRecordedPayouts(existingPayouts);
             alert(`Импорт выплат завершен.\nНовых записей: ${importedCount}\nПропущено дубликатов: ${duplicateCount}\nОшибок: ${errorCount}`);
             
-            updateTotalActualPayoutsDisplay();
-            updateNetBalanceDisplay();
-            if (payoutsView.style.display === 'block') renderPayoutsTable(dateFilterFromInput.value, dateFilterToInput.value);
+            //Update displays based on current filters
+            updateTotalActualPayoutsDisplay(dateFilterFromInput.value, dateFilterToInput.value);
+            updateNetBalanceDisplay(); // This also respects filters implicitly
+            if (payoutsView.style.display === 'block') {
+                renderPayoutsTable(dateFilterFromInput.value, dateFilterToInput.value);
+            }
             
             importPayoutsCsvInput.value = '';
             closeFileMenu();
@@ -1196,14 +1294,23 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     backupAllDataButton.addEventListener('click', exportAllDataForBackup);
 
+    toggleWeeklySummaryButton.addEventListener('click', () => {
+        const isExpanded = toggleWeeklySummaryButton.getAttribute('aria-expanded') === 'true';
+        weeklySummaryDetailsRegion.style.display = isExpanded ? 'none' : 'block';
+        toggleWeeklySummaryButton.setAttribute('aria-expanded', String(!isExpanded));
+        const icon = toggleWeeklySummaryButton.querySelector('.toggle-icon');
+        if (icon) {
+            icon.textContent = isExpanded ? '▼' : '▲';
+        }
+    });
 
     // --- Initialization ---
     loadSettings(); 
     resetCalculatorForm(true); 
     showCalculatorView(); 
     calculateResults(); 
-    updateTotalActualPayoutsDisplay(); 
-    updateNetBalanceDisplay(); 
+    updateTotalActualPayoutsDisplay(); // Initial display without filters (shows all)
+    // updateNetBalanceDisplay(); // Called within renderSummaryTable by applyFilters initially
     if (actualPayoutDateInput) {
         actualPayoutDateInput.value = formatDateForStorage(new Date());
     }

@@ -118,7 +118,6 @@ h3 {
     margin-top: 15px;
     margin-bottom: 10px;
 }
-
 #overall-statistics-section h3 { /* Specific styling for the new section's h3 */
     margin-top: 0; /* Override default h3 margin-top if summary-totals-container adds padding */
     margin-bottom: 15px; /* Ensure space before the first result item */
@@ -288,11 +287,12 @@ button#recordActualPayoutButton:active,
 
 /* Summary View Styles */
 #summary-view .table-container,
-#payouts-view .table-container {
+#payouts-view .table-container,
+#weekly-summary-details-region .table-container { /* Added weekly summary */
     overflow-x: auto; 
 }
 
-#summary-table, #payouts-table {
+#summary-table, #payouts-table, #weekly-summary-table { /* Added weekly summary */
     width: 100%;
     border-collapse: collapse;
     margin-top: 15px;
@@ -300,24 +300,27 @@ button#recordActualPayoutButton:active,
 }
 
 #summary-table th, #summary-table td,
-#payouts-table th, #payouts-table td {
+#payouts-table th, #payouts-table td,
+#weekly-summary-table th, #weekly-summary-table td { /* Added weekly summary */
     border: 1px solid #dee2e6;
     padding: 8px 12px;
     text-align: left;
 }
 
-#summary-table th, #payouts-table th {
+#summary-table th, #payouts-table th, #weekly-summary-table th { /* Added weekly summary */
     background-color: #e9ecef;
     font-weight: bold;
 }
 
 #summary-table tbody tr:nth-child(even),
-#payouts-table tbody tr:nth-child(even) {
+#payouts-table tbody tr:nth-child(even),
+#weekly-summary-table tbody tr:nth-child(even) { /* Added weekly summary */
     background-color: #f8f9fa;
 }
 
 #summary-table tbody tr:hover,
-#payouts-table tbody tr:hover {
+#payouts-table tbody tr:hover,
+#weekly-summary-table tbody tr:hover { /* Added weekly summary */
     background-color: #e2e6ea;
 }
 
@@ -427,6 +430,9 @@ p#total-actual-payouts-display.total-display {
     background-color: #e9ecef;
     border-radius: 4px;
 }
+#total-actual-payouts-label-text { /* Style for the dynamic label part */
+    color: #333; /* Or inherit */
+}
 
 /* Summary Controls (e.g., Export Button) */
 .summary-controls-container {
@@ -490,6 +496,54 @@ p#total-actual-payouts-display.total-display {
 }
 #settings-view .form-group input.settings-input {
     width: calc(100% - 22px); /* Consistent with other inputs */
+}
+
+/* Weekly Summary Styles */
+#weekly-summary-container {
+    margin-bottom: 20px;
+    background-color: #f8f9fa; /* Light background for the whole container */
+    padding: 15px;
+    border-radius: 4px;
+    border: 1px solid #dee2e6;
+}
+
+button.toggle-summary-button {
+    width: 100%;
+    padding: 10px 15px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    text-align: left;
+    transition: background-color 0.2s;
+    display: flex; /* For aligning text and icon */
+    justify-content: space-between; /* Pushes icon to the right */
+    align-items: center;
+}
+
+button.toggle-summary-button:hover {
+    background-color: #0056b3;
+}
+
+button.toggle-summary-button .toggle-icon {
+    transition: transform 0.3s ease;
+}
+
+button.toggle-summary-button[aria-expanded="true"] .toggle-icon {
+    transform: rotate(180deg);
+}
+
+#weekly-summary-details-region {
+    margin-top: 15px; /* Space between button and table */
+    border-top: 1px solid #dee2e6; /* Separator */
+    padding-top: 15px;
+}
+
+#weekly-summary-table {
+    margin-top: 0; /* Remove default table margin if it's inside a padded container */
+    margin-bottom: 10px; /* Space before no-data message if shown */
 }
 
 
@@ -566,5 +620,8 @@ p#total-actual-payouts-display.total-display {
     }
     .payouts-controls-container #export-payouts-csv-button {
          margin-top: 10px;
+    }
+    button.toggle-summary-button {
+        font-size: 0.95rem;
     }
 }
