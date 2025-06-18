@@ -19,7 +19,7 @@ interface TripData {
 
     // Calculated values
     zakazovVsego: number;
-    summaVyplatRaschetnaya: number;
+    summaVyplatRaschetnaya: number; // This will now be net of tax
 }
 
 interface ActualPayout {
@@ -34,7 +34,8 @@ interface AppSettings {
     u1_cenaZakazaPosle23: number;
     v1_srednyayaKompensatsiaToplivo: number;
     k1_smenaChDefault: number; 
-    amortizationPerKm: number; // New setting for amortization cost per km
+    amortizationPerKm: number;
+    taxRate: number; // New setting for tax rate in percent
 }
 
 interface WeeklyAggregatedData {
@@ -42,7 +43,7 @@ interface WeeklyAggregatedData {
     weekEndDate: string;   // Sunday's date YYYY-MM-DD
     weekLabel: string; // e.g. "2023-10-23 - 2023-10-29"
     totalOrders: number;
-    totalPayout: number;
+    totalPayout: number; // This will be sum of net-of-tax payouts
     shiftsWorked: number;
 }
 
@@ -55,7 +56,8 @@ document.addEventListener('DOMContentLoaded', () => {
         u1_cenaZakazaPosle23: 208.54,
         v1_srednyayaKompensatsiaToplivo: 37,
         k1_smenaChDefault: 6, 
-        amortizationPerKm: 3, // Default amortization cost
+        amortizationPerKm: 3, 
+        taxRate: 6, // Default tax rate (e.g., 6%)
     };
     let appSettings = { ...DEFAULT_SETTINGS };
     const SETTINGS_LS_KEY = 'taxiCalculatorAppSettings';
@@ -172,6 +174,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const settingV1KompensatsiaInput = document.getElementById('settingV1Kompensatsia') as HTMLInputElement;
     const settingK1SmenaDefaultInput = document.getElementById('settingK1SmenaDefault') as HTMLInputElement; 
     const settingAmortizationPerKmInput = document.getElementById('settingAmortizationPerKm') as HTMLInputElement;
+    const settingTaxRateInput = document.getElementById('settingTaxRate') as HTMLInputElement; // New Tax Rate Input
     const saveSettingsButton = document.getElementById('save-settings-button') as HTMLButtonElement;
     const backToCalculatorButton = document.getElementById('back-to-calculator-button') as HTMLButtonElement;
 
@@ -201,6 +204,7 @@ document.addEventListener('DOMContentLoaded', () => {
         settingV1KompensatsiaInput.value = appSettings.v1_srednyayaKompensatsiaToplivo.toString();
         settingK1SmenaDefaultInput.value = appSettings.k1_smenaChDefault.toString();
         settingAmortizationPerKmInput.value = appSettings.amortizationPerKm.toString();
+        settingTaxRateInput.value = appSettings.taxRate.toString();
     };
 
     const saveSettings = () => {
@@ -210,10 +214,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const newV1 = parseFloat(settingV1KompensatsiaInput.value);
         const newK1 = parseFloat(settingK1SmenaDefaultInput.value);
         const newAmortization = parseFloat(settingAmortizationPerKmInput.value);
+        const newTaxRate = parseFloat(settingTaxRateInput.value);
 
-        if (isNaN(newS1) || isNaN(newT1) || isNaN(newU1) || isNaN(newV1) || isNaN(newK1) || isNaN(newAmortization) ||
-            newS1 < 0 || newT1 < 0 || newU1 < 0 || newV1 < 0 || newK1 <=0 || newAmortization < 0 ) {
-            alert("Все значения настроек должны быть положительными числами (продолжительность смены > 0). Стоимость амортизации не может быть отрицательной.");
+        if (isNaN(newS1) || isNaN(newT1) || isNaN(newU1) || isNaN(newV1) || isNaN(newK1) || isNaN(newAmortization) || isNaN(newTaxRate) ||
+            newS1 < 0 || newT1 < 0 || newU1 < 0 || newV1 < 0 || newK1 <=0 || newAmortization < 0 || newTaxRate < 0 || newTaxRate > 100 ) {
+            alert("Все значения настроек должны быть положительными числами (продолжительность смены > 0). Стоимость амортизации и ставка налога не могут быть отрицательными. Ставка налога не может быть больше 100%.");
             return false;
         }
 
@@ -223,11 +228,12 @@ document.addEventListener('DOMContentLoaded', () => {
         appSettings.v1_srednyayaKompensatsiaToplivo = newV1;
         appSettings.k1_smenaChDefault = newK1;
         appSettings.amortizationPerKm = newAmortization;
+        appSettings.taxRate = newTaxRate;
 
         localStorage.setItem(SETTINGS_LS_KEY, JSON.stringify(appSettings));
         alert("Настройки сохранены!");
         calculateResults(); 
-        if (summaryView.style.display === 'block') applyFilters(); // Re-apply filters if summary view is active
+        if (summaryView.style.display === 'block') applyFilters();
         return true;
     };
 
@@ -272,7 +278,7 @@ document.addEventListener('DOMContentLoaded', () => {
             alert("Нет данных для экспорта в выбранном периоде.");
             return;
         }
-        const headers = ["День недели", "Дата", "Количество заказов", "Сумма выплат расчетная (р.)"];
+        const headers = ["День недели", "Дата", "Количество заказов", "Сумма выплат расчетная (после налога, р.)"]; // Updated header
         const csvRows = [
             headers.join(','),
             ...data.map(row => [
@@ -405,22 +411,26 @@ document.addEventListener('DOMContentLoaded', () => {
         const I1_gsmR = H1_toplivaZatracheno * G1_cenaAI92;
         gsmResultSpan.textContent = I1_gsmR.toFixed(2) + ' р.';
 
-        const N1_summaVyplatRaschetnaya = 
+        const N1_summaVyplatRaschetnaya_GROSS = 
             (C1_zakazovVsego * appSettings.v1_srednyayaKompensatsiaToplivo) + 
             (M1_zakazovPosle23 * appSettings.u1_cenaZakazaPosle23) + 
             (L1_zakazovDo23 * appSettings.t1_cenaZakazaDo23);
-        summaVyplatRaschetnayaResultSpan.textContent = N1_summaVyplatRaschetnaya.toFixed(2) + ' р.';
+        
+        const taxAmount = N1_summaVyplatRaschetnaya_GROSS * (appSettings.taxRate / 100);
+        const N1_summaVyplatRaschetnaya_NET = N1_summaVyplatRaschetnaya_GROSS - taxAmount;
 
-        const P1_summaChistymiRaschetnaya = N1_summaVyplatRaschetnaya - I1_gsmR;
+        summaVyplatRaschetnayaResultSpan.textContent = N1_summaVyplatRaschetnaya_NET.toFixed(2) + ' р.';
+
+        const P1_summaChistymiRaschetnaya = N1_summaVyplatRaschetnaya_NET - I1_gsmR;
         summaChistymiRaschetnayaResultSpan.textContent = P1_summaChistymiRaschetnaya.toFixed(2) + ' р.';
 
-        let Q1_protsentZatrat = N1_summaVyplatRaschetnaya > 0 ? (I1_gsmR / N1_summaVyplatRaschetnaya) * 100 : 0;
+        let Q1_protsentZatrat = N1_summaVyplatRaschetnaya_NET > 0 ? (I1_gsmR / N1_summaVyplatRaschetnaya_NET) * 100 : 0;
         prosentZatratResultSpan.textContent = Q1_protsentZatrat.toFixed(2) + ' %';
 
         let R1_vChasChistymi = K1_smenaCh > 0 ? P1_summaChistymiRaschetnaya / K1_smenaCh : 0;
         vChasChistymiResultSpan.textContent = R1_vChasChistymi.toFixed(2) + ' р.';
         
-        currentCalculatedData = { C1_zakazovVsego, N1_summaVyplatRaschetnaya };
+        currentCalculatedData = { C1_zakazovVsego, N1_summaVyplatRaschetnaya: N1_summaVyplatRaschetnaya_NET };
         return true;
     };
     
@@ -448,11 +458,10 @@ document.addEventListener('DOMContentLoaded', () => {
         settingsView.style.display = 'none';
         setActiveNavButton(navSummaryButton);
         
-        // Set default "From" date if both filters are empty (e.g., on first load of summary view)
         if (!dateFilterFromInput.value && !dateFilterToInput.value) {
             dateFilterFromInput.value = formatDateForStorage(getMonday(new Date()));
         }
-        applyFilters(); // This will render tables and update displays based on filters
+        applyFilters(); 
         lastActiveViewFn = showSummaryView;
     };
 
@@ -462,7 +471,7 @@ document.addEventListener('DOMContentLoaded', () => {
         payoutsView.style.display = 'block';
         settingsView.style.display = 'none';
         setActiveNavButton(navPayoutsButton);
-        const filterFrom = dateFilterFromInput.value; // Use existing filters from summary view
+        const filterFrom = dateFilterFromInput.value; 
         const filterTo = dateFilterToInput.value;
         renderPayoutsTable(filterFrom, filterTo);
         editPayoutSection.style.display = 'none'; 
@@ -534,7 +543,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const filterTo = dateFilterToInput.value;
 
         const filteredTrips = getFilteredTripData(filterFrom, filterTo);
-        const totalCalculatedPayoutInPeriod = filteredTrips.reduce((sum, trip) => sum + trip.summaVyplatRaschetnaya, 0);
+        const totalCalculatedPayoutInPeriod = filteredTrips.reduce((sum, trip) => sum + trip.summaVyplatRaschetnaya, 0); // This is now net-of-tax sum
         
         const totalActualPayoutsInPeriod = getFilteredActualPayoutsSum(filterFrom, filterTo);
         
@@ -546,7 +555,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const renderOverallStatistics = (
         filteredTrips: TripData[],
         periodTotalOrders: number,
-        periodTotalCalculatedPayout: number
+        periodTotalCalculatedPayout: number // This is net-of-tax
     ) => {
         let statShiftsWorked = 0;
         let statTotalMileage = 0;
@@ -561,9 +570,9 @@ document.addEventListener('DOMContentLoaded', () => {
         let statTotalAmortizationCost = 0;
         let statFuelCostPercentage = 0;
         let statTotalCostPercentage = 0;
-        let statAvgHourlyIncome = 0;
+        let statAvgHourlyIncome = 0; // Net hourly income after tax, fuel, amortization
         let statEquivalentMonthlyIncome = 0;
-        let statAvgGrossPerShiftInPeriod = 0; 
+        let statAvgNetPayoutPerShiftInPeriod = 0; // Changed from Gross
 
         if (filteredTrips.length > 0) {
             overallStatisticsSection.style.display = 'block';
@@ -591,22 +600,24 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             statTotalAmortizationCost = statTotalMileage * appSettings.amortizationPerKm;
+            // periodTotalCalculatedPayout is already net-of-tax
             statFuelCostPercentage = periodTotalCalculatedPayout > 0 ? (statTotalFuelCost / periodTotalCalculatedPayout) * 100 : 0;
             const totalExpenses = statTotalFuelCost + statTotalAmortizationCost;
             statTotalCostPercentage = periodTotalCalculatedPayout > 0 ? (totalExpenses / periodTotalCalculatedPayout) * 100 : 0;
             
             const totalHoursWorked = statShiftsWorked * appSettings.k1_smenaChDefault;
-            statAvgHourlyIncome = totalHoursWorked > 0 ? (periodTotalCalculatedPayout - totalExpenses) / totalHoursWorked : 0; // Net hourly income
+            // Payout is net-of-tax. Expenses are fuel + amortization.
+            statAvgHourlyIncome = totalHoursWorked > 0 ? (periodTotalCalculatedPayout - totalExpenses) / totalHoursWorked : 0;
             statEquivalentMonthlyIncome = statAvgHourlyIncome * 8 * 21; 
 
-            statAvgGrossPerShiftInPeriod = statShiftsWorked > 0 ? periodTotalCalculatedPayout / statShiftsWorked : 0;
+            statAvgNetPayoutPerShiftInPeriod = statShiftsWorked > 0 ? periodTotalCalculatedPayout / statShiftsWorked : 0;
 
         } else {
             overallStatisticsSection.style.display = 'none';
         }
 
         let statEarningsForecast = 0;
-        const allTripsForForecast = getTripData();
+        const allTripsForForecast = getTripData(); // Contains net-of-tax payouts
         const now = new Date();
         const currentYear = now.getFullYear();
         const currentMonth = now.getMonth(); 
@@ -617,15 +628,15 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         if (tripsThisMonth.length > 0) {
-            let totalPayoutCurrentMonth = 0;
+            let totalNetPayoutCurrentMonth = 0;
             let totalOrdersCurrentMonth = 0;
             tripsThisMonth.forEach(trip => {
-                totalPayoutCurrentMonth += trip.summaVyplatRaschetnaya;
+                totalNetPayoutCurrentMonth += trip.summaVyplatRaschetnaya; // This is already net-of-tax
                 totalOrdersCurrentMonth += trip.zakazovVsego;
             });
             const shiftsWorkedCurrentMonth = tripsThisMonth.length;
 
-            const avgIncomePerOrderCurrentMonth = totalOrdersCurrentMonth > 0 ? totalPayoutCurrentMonth / totalOrdersCurrentMonth : 0;
+            const avgNetIncomePerOrderCurrentMonth = totalOrdersCurrentMonth > 0 ? totalNetPayoutCurrentMonth / totalOrdersCurrentMonth : 0;
             const avgOrdersPerShiftCurrentMonth = shiftsWorkedCurrentMonth > 0 ? totalOrdersCurrentMonth / shiftsWorkedCurrentMonth : 0;
 
             let tuesdaysInMonth = 0, wednesdaysInMonth = 0, fridaysInMonth = 0, saturdaysInMonth = 0;
@@ -639,7 +650,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 else if (dayOfWeek === 6) saturdaysInMonth++;  
             }
             const effectiveDaysForForecast = tuesdaysInMonth + fridaysInMonth + saturdaysInMonth + (wednesdaysInMonth / 2);
-            statEarningsForecast = avgIncomePerOrderCurrentMonth * avgOrdersPerShiftCurrentMonth * effectiveDaysForForecast;
+            statEarningsForecast = avgNetIncomePerOrderCurrentMonth * avgOrdersPerShiftCurrentMonth * effectiveDaysForForecast; // Forecast of net-of-tax earnings
         }
 
         const today = new Date();
@@ -660,7 +671,7 @@ document.addEventListener('DOMContentLoaded', () => {
         overallStatsTotalCostPercentageSpan.textContent = isNaN(statTotalCostPercentage) || !isFinite(statTotalCostPercentage) ? 'Н/Д' : statTotalCostPercentage.toFixed(2) + ' %';
         overallStatsAvgHourlyIncomeSpan.textContent = isNaN(statAvgHourlyIncome) || !isFinite(statAvgHourlyIncome) ? 'Н/Д' : statAvgHourlyIncome.toFixed(2) + ' р.';
         overallStatsEquivalentMonthlyIncomeSpan.textContent = isNaN(statEquivalentMonthlyIncome) || !isFinite(statEquivalentMonthlyIncome) ? 'Н/Д' : statEquivalentMonthlyIncome.toFixed(2) + ' р.';
-        overallStatsAvgGrossPerShiftPeriodSpan.textContent = isNaN(statAvgGrossPerShiftInPeriod) || !isFinite(statAvgGrossPerShiftInPeriod) ? 'Н/Д' : statAvgGrossPerShiftInPeriod.toFixed(2) + ' р.';
+        overallStatsAvgGrossPerShiftPeriodSpan.textContent = isNaN(statAvgNetPayoutPerShiftInPeriod) || !isFinite(statAvgNetPayoutPerShiftInPeriod) ? 'Н/Д' : statAvgNetPayoutPerShiftInPeriod.toFixed(2) + ' р.';
         overallStatsMonthProgressPercentageSpan.textContent = isNaN(statMonthProgressPercentage) || !isFinite(statMonthProgressPercentage) ? '0.0' : statMonthProgressPercentage.toFixed(1) + ' %';
         overallStatsEarningsForecastSpan.textContent = isNaN(statEarningsForecast) || !isFinite(statEarningsForecast) ? 'Н/Д' : statEarningsForecast.toFixed(2) + ' р.';
     };
@@ -672,7 +683,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         summaryTableBody.innerHTML = ''; 
         let grandTotalOrders = 0;
-        let grandTotalPayout = 0;
+        let grandTotalPayout = 0; // This will be sum of net-of-tax payouts
 
         if (dataToRender.length === 0) {
             noDataMessage.style.display = 'block';
@@ -688,7 +699,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 row.insertCell().textContent = item.denNedeli;
                 row.insertCell().textContent = item.data;
                 row.insertCell().textContent = item.zakazovVsego.toString();
-                row.insertCell().textContent = item.summaVyplatRaschetnaya.toFixed(2);
+                row.insertCell().textContent = item.summaVyplatRaschetnaya.toFixed(2); // This is net-of-tax
 
                 const actionsCell = row.insertCell();
                 const editButtonEl = document.createElement('button');
@@ -699,7 +710,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 actionsCell.appendChild(editButtonEl);
 
                 grandTotalOrders += item.zakazovVsego;
-                grandTotalPayout += item.summaVyplatRaschetnaya;
+                grandTotalPayout += item.summaVyplatRaschetnaya; // Summing net-of-tax payouts
             });
             totalOrdersSpan.textContent = grandTotalOrders.toString();
             totalPayoutSpan.textContent = grandTotalPayout.toFixed(2);
@@ -718,8 +729,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (filterTo) {
             payoutsToSum = payoutsToSum.filter(p => p.date <= filterTo);
         }
-        // If no filters, all payouts are summed
-
+        
         const total = payoutsToSum.reduce((sum, payout) => sum + payout.amount, 0);
         totalActualPayoutsSumSpan.textContent = total.toFixed(2);
 
@@ -759,7 +769,6 @@ document.addEventListener('DOMContentLoaded', () => {
         actualPayoutDateInput.value = formatDateForStorage(new Date()); 
         actualPayoutAmountInput.value = '0';
         
-        // Update displays based on current filters
         updateTotalActualPayoutsDisplay(dateFilterFromInput.value, dateFilterToInput.value);
         updateNetBalanceDisplay(); 
         
@@ -769,7 +778,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     const renderWeeklySummaryTable = (filterFrom?: string, filterTo?: string) => {
-        const trips = getFilteredTripData(filterFrom, filterTo);
+        const trips = getFilteredTripData(filterFrom, filterTo); // trips contain net-of-tax payouts
         weeklySummaryTableBody.innerHTML = '';
 
         if (trips.length === 0) {
@@ -800,14 +809,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     weekEndDate: sundayString,
                     weekLabel: weekLabel,
                     totalOrders: 0,
-                    totalPayout: 0,
+                    totalPayout: 0, // Will sum net-of-tax payouts
                     shiftsWorked: 0,
                 });
             }
 
             const week = weeklyData.get(mondayString)!;
             week.totalOrders += trip.zakazovVsego;
-            week.totalPayout += trip.summaVyplatRaschetnaya;
+            week.totalPayout += trip.summaVyplatRaschetnaya; // Summing net-of-tax
             week.shiftsWorked += 1;
         });
 
@@ -819,10 +828,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const row = weeklySummaryTableBody.insertRow();
             row.insertCell().textContent = week.weekLabel;
             row.insertCell().textContent = week.totalOrders.toString();
-            row.insertCell().textContent = week.totalPayout.toFixed(2);
+            row.insertCell().textContent = week.totalPayout.toFixed(2); // Displaying sum of net-of-tax
             row.insertCell().textContent = week.shiftsWorked.toString();
             const avgOrdersPerShift = week.shiftsWorked > 0 ? (week.totalOrders / week.shiftsWorked).toFixed(2) : '0.00';
-            const avgPayoutPerShift = week.shiftsWorked > 0 ? (week.totalPayout / week.shiftsWorked).toFixed(2) : '0.00';
+            const avgPayoutPerShift = week.shiftsWorked > 0 ? (week.totalPayout / week.shiftsWorked).toFixed(2) : '0.00'; // Avg net-of-tax payout
             row.insertCell().textContent = avgOrdersPerShift;
             row.insertCell().textContent = avgPayoutPerShift;
         });
@@ -921,7 +930,6 @@ document.addEventListener('DOMContentLoaded', () => {
             alert("Выплата обновлена.");
             editPayoutSection.style.display = 'none';
             editingPayoutId = null;
-            // Re-render with current filters
             renderPayoutsTable(dateFilterFromInput.value, dateFilterToInput.value);
             updateTotalActualPayoutsDisplay(dateFilterFromInput.value, dateFilterToInput.value); 
             updateNetBalanceDisplay(); 
@@ -937,7 +945,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     saveButton.addEventListener('click', () => {
-        const calculationSuccess = calculateResults();
+        const calculationSuccess = calculateResults(); // This now calculates net-of-tax payout
         if (!dataInput.value) {
             alert("Пожалуйста, выберите дату."); dataInput.focus(); return;
         }
@@ -963,7 +971,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     ...allData[index], 
                     ...tripEntryData, 
                     zakazovVsego: currentCalculatedData.C1_zakazovVsego, 
-                    summaVyplatRaschetnaya: currentCalculatedData.N1_summaVyplatRaschetnaya 
+                    summaVyplatRaschetnaya: currentCalculatedData.N1_summaVyplatRaschetnaya // Storing net-of-tax
                 };
                 alert('Запись успешно обновлена!');
             } else {
@@ -976,7 +984,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     ...allData[existingEntryIndex], 
                     ...tripEntryData,
                     zakazovVsego: currentCalculatedData.C1_zakazovVsego,
-                    summaVyplatRaschetnaya: currentCalculatedData.N1_summaVyplatRaschetnaya
+                    summaVyplatRaschetnaya: currentCalculatedData.N1_summaVyplatRaschetnaya // Storing net-of-tax
                 };
                 alert(`Запись за ${dataInput.value} обновлена!`);
             } else {
@@ -984,13 +992,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     id: Date.now().toString() + Math.random().toString().substring(2),
                     ...tripEntryData, 
                     zakazovVsego: currentCalculatedData.C1_zakazovVsego,
-                    summaVyplatRaschetnaya: currentCalculatedData.N1_summaVyplatRaschetnaya
+                    summaVyplatRaschetnaya: currentCalculatedData.N1_summaVyplatRaschetnaya // Storing net-of-tax
                 });
                 alert('Данные успешно записаны!');
             }
         }
         saveTripDataToLS(allData);
-        if (summaryView.style.display === 'block') applyFilters(); // Re-apply filters if summary view is active
+        if (summaryView.style.display === 'block') applyFilters(); 
         resetCalculatorForm(true); 
         calculateResults(); 
     });
@@ -1023,9 +1031,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const filterFrom = dateFilterFromInput.value;
         const filterTo = dateFilterToInput.value;
 
-        renderSummaryTable(); // Uses global filter inputs internally. Calls updateNetBalanceDisplay and renderOverallStatistics.
+        renderSummaryTable(); 
         renderWeeklySummaryTable(filterFrom, filterTo);
-        updateTotalActualPayoutsDisplay(filterFrom, filterTo); // Update the visual sum in "Actual Payout" section.
+        updateTotalActualPayoutsDisplay(filterFrom, filterTo); 
 
         if (payoutsView.style.display === 'block') {
             renderPayoutsTable(filterFrom, filterTo);
@@ -1035,8 +1043,8 @@ document.addEventListener('DOMContentLoaded', () => {
     applyDateFilterButton.addEventListener('click', applyFilters);
 
     resetDateFilterButton.addEventListener('click', () => {
-        dateFilterFromInput.value = formatDateForStorage(getMonday(new Date())); // Default "from"
-        dateFilterToInput.value = ''; // Clear "to"
+        dateFilterFromInput.value = formatDateForStorage(getMonday(new Date())); 
+        dateFilterToInput.value = ''; 
         applyFilters();
     });
 
@@ -1125,14 +1133,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     const denNedeli = getDayOfWeekName(formattedDate);
                     const C1_zakazovVsego = zakazovDo23 + zakazovPosle23;
-                    const N1_summaVyplatRaschetnaya = 
+                    
+                    const N1_summaVyplatRaschetnaya_GROSS_Import = 
                         (C1_zakazovVsego * appSettings.v1_srednyayaKompensatsiaToplivo) + 
                         (zakazovPosle23 * appSettings.u1_cenaZakazaPosle23) + 
                         (zakazovDo23 * appSettings.t1_cenaZakazaDo23);
+                    const taxAmount_Import = N1_summaVyplatRaschetnaya_GROSS_Import * (appSettings.taxRate / 100);
+                    const N1_summaVyplatRaschetnaya_NET_Import = N1_summaVyplatRaschetnaya_GROSS_Import - taxAmount_Import;
                     
                     const newTrip: Omit<TripData, 'id'> = {
                         denNedeli, data: formattedDate, probeg, raskhod, cenaAI92, 
-                        zakazovDo23, zakazovPosle23, zakazovVsego: C1_zakazovVsego, summaVyplatRaschetnaya: N1_summaVyplatRaschetnaya
+                        zakazovDo23, zakazovPosle23, zakazovVsego: C1_zakazovVsego, summaVyplatRaschetnaya: N1_summaVyplatRaschetnaya_NET_Import
                     };
 
                     const existingIndex = existingTrips.findIndex(t => t.data === formattedDate);
@@ -1150,7 +1161,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             saveTripDataToLS(existingTrips);
             alert(`Импорт поездок завершен.\nНовых записей: ${importedCount}\nОбновлено записей: ${updatedCount}\nОшибок: ${errorCount}`);
-            if (summaryView.style.display === 'block') applyFilters(); // Re-apply filters
+            if (summaryView.style.display === 'block') applyFilters();
             importTripsCsvInput.value = ''; 
             closeFileMenu();
         };
@@ -1221,9 +1232,8 @@ document.addEventListener('DOMContentLoaded', () => {
             saveRecordedPayouts(existingPayouts);
             alert(`Импорт выплат завершен.\nНовых записей: ${importedCount}\nПропущено дубликатов: ${duplicateCount}\nОшибок: ${errorCount}`);
             
-            //Update displays based on current filters
             updateTotalActualPayoutsDisplay(dateFilterFromInput.value, dateFilterToInput.value);
-            updateNetBalanceDisplay(); // This also respects filters implicitly
+            updateNetBalanceDisplay(); 
             if (payoutsView.style.display === 'block') {
                 renderPayoutsTable(dateFilterFromInput.value, dateFilterToInput.value);
             }
@@ -1240,9 +1250,19 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     const exportAllDataForBackup = () => {
-        const allTrips = getTripData();
+        const allTrips = getTripData(); // Contains net-of-tax summaVyplatRaschetnaya
         if (allTrips.length > 0) {
-            const tripsHeaders = ["Дата", "Пробег", "Расход", "Цена АИ-92", "Смена", "Заказов до 23", "Заказов после 23"];
+             // For backup, we export the raw input fields to allow recalculation on import if settings change.
+             // However, summaVyplatRaschetnaya is already net-of-tax.
+             // The import for trips recalculates summaVyplatRaschetnaya based on current settings,
+             // so the value in the CSV for this field is effectively ignored if we use the current import logic.
+             // For a pure backup/restore that preserves the exact calculated value at the time of backup,
+             // the import logic would need to be different (e.g., optionally trust the CSV's calculated value).
+             // Current approach: CSV for backup will contain the net-of-tax value, but import recalculates.
+             // To make backup more robust for 'summaVyplatRaschetnaya', we'd need to change import or store gross.
+             // Given the current structure, exporting the net amount is consistent.
+
+            const tripsHeaders = ["Дата", "Пробег", "Расход", "Цена АИ-92", "Смена", "Заказов до 23", "Заказов после 23" /*, "Сумма выплат (нетто)" - implicitly this is what's stored */];
             const tripsCsvRows = [
                 tripsHeaders.join(','),
                 ...allTrips.map(trip => [
@@ -1253,6 +1273,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     appSettings.k1_smenaChDefault, 
                     trip.zakazovDo23,
                     trip.zakazovPosle23
+                    // trip.summaVyplatRaschetnaya.toFixed(2) // If we wanted to explicitly back up the calculated net amount
                 ].join(','))
             ];
             const tripsCsvString = `\uFEFF${tripsCsvRows.join('\n')}`;
@@ -1309,8 +1330,7 @@ document.addEventListener('DOMContentLoaded', () => {
     resetCalculatorForm(true); 
     showCalculatorView(); 
     calculateResults(); 
-    updateTotalActualPayoutsDisplay(); // Initial display without filters (shows all)
-    // updateNetBalanceDisplay(); // Called within renderSummaryTable by applyFilters initially
+    updateTotalActualPayoutsDisplay(); 
     if (actualPayoutDateInput) {
         actualPayoutDateInput.value = formatDateForStorage(new Date());
     }

@@ -94,7 +94,7 @@
                     <p>ГСМ, р.: <span id="gsmResult" aria-live="polite">_</span></p>
                 </div>
                 <div class="result-item">
-                    <p>Сумма выплат расчетная, р.: <span id="summaVyplatRaschetnayaResult" aria-live="polite">_</span></p>
+                    <p>Сумма выплат (расч., после налога), р.: <span id="summaVyplatRaschetnayaResult" aria-live="polite">_</span></p>
                 </div>
                 <div class="result-item">
                     <p>Сумма чистыми расчетная (-ГСМ), р.: <span id="summaChistymiRaschetnayaResult" aria-live="polite">_</span></p>
@@ -199,7 +199,7 @@
                     <div class="result-item"><p>Соотв. 5/2/8 (21 раб. день, в периоде), р.: <span id="overall-stats-equivalent-monthly-income" aria-live="polite">_</span></p></div>
                     <div class="result-item"><p>Прошло месяца, %: <span id="overall-stats-month-progress-percentage" aria-live="polite">_</span></p></div>
                     <div class="result-item"><p>Прогноз заработка на текущий месяц (по Вт,Ср,Пт,Сб), р.: <span id="overall-stats-earnings-forecast" aria-live="polite">_</span></p></div>
-                    <div class="result-item"><p>Грязными в смену в среднем (в периоде), р.: <span id="overall-stats-avg-gross-per-effective-shift" aria-live="polite">_</span></p></div>
+                    <div class="result-item"><p>Выплат в смену (после налога, в периоде), р.: <span id="overall-stats-avg-gross-per-effective-shift" aria-live="polite">_</span></p></div>
                 </div>
 
                 <div class="table-container">
@@ -290,6 +290,10 @@
                 <div class="form-group">
                     <label for="settingAmortizationPerKm">Стоимость амортизации авто на 1 км, р.:</label>
                     <input type="number" id="settingAmortizationPerKm" step="any" class="settings-input">
+                </div>
+                <div class="form-group">
+                    <label for="settingTaxRate">Ставка налога, %:</label>
+                    <input type="number" id="settingTaxRate" step="0.01" class="settings-input" min="0" max="100">
                 </div>
 
                 <button id="save-settings-button">Сохранить настройки</button>
